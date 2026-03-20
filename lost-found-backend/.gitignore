@@ -26,7 +26,7 @@ desktop.ini
 *.sln
 *.sw?
 node_modules/
-.env.*
+.env
 !.env.example  # Good practice: keep a template file for other devs
 /uploads
 coverage/
