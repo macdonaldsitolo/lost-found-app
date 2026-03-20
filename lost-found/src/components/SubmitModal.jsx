@@ -21,7 +21,9 @@ function SubmitModal({ visible, type, category, onClose }) {
 
   // Determine message
   let message = ""
-  if (category === "Person") {
+if (type === "claim") {
+  message = "Your claim has been submitted. We'll review it and help you recover your gadget."
+} else if (category === "Person") {
     if (type === "lost") {
       message = "You reported a missing person. The right people will be notified. Stay calm."
     } else {
@@ -61,8 +63,7 @@ function SubmitModal({ visible, type, category, onClose }) {
         {loading ? (
           <>
             <div style={styles.loader}></div>
-            <p>Submitting your report...</p>
-          </>
+<p>{type === "claim" ? "Submitting your claim..." : "Submitting your report..."}</p>          </>
         ) : (
           <>
             <div style={styles.animation}>

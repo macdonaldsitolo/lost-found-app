@@ -16,6 +16,9 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+Thumbs.db
+desktop.ini
+
 .DS_Store
 *.suo
 *.ntvs*
@@ -23,5 +26,8 @@ dist-ssr
 *.sln
 *.sw?
 node_modules/
-.env
-dist/
+.env.*
+!.env.example  # Good practice: keep a template file for other devs
+/uploads
+coverage/
+*.lcov
