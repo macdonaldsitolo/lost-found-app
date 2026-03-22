@@ -28,7 +28,7 @@ function Home() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/api/items`)
+    axios.get(`${import.meta.env.VITE_API_URL}api/items`)
       .then(res => {
         // Only show active items on the homepage
         setItems(res.data.filter(i => i.status !== "resolved"))

@@ -154,7 +154,7 @@ export default function ItemDetail() {
   const [caringLoading, setCaringLoading] = useState(false)
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/api/items/${id}`)
+    axios.get(`${import.meta.env.VITE_API_URL}api/items/${id}`)
       .then(res => {
         setItem(res.data)
         setCaresCount(res.data.cares?.length || 0)
@@ -184,7 +184,7 @@ export default function ItemDetail() {
     if (caringLoading) return
     setCaringLoading(true)
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/items/${id}/care`)
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}api/items/${id}/care`)
       setCaresCount(res.data.cares)
       setIsCared(res.data.cared)
     } catch {}
@@ -198,7 +198,7 @@ export default function ItemDetail() {
 
   const handleShared = async () => {
     try {
-      const res = await axios.patch(`${import.meta.env.VITE_API_URL}/api/items/${id}/share`)
+      const res = await axios.patch(`${import.meta.env.VITE_API_URL}api/items/${id}/share`)
       setSharesCount(res.data.shares)
     } catch {}
   }
@@ -206,7 +206,7 @@ export default function ItemDetail() {
   // ── Resolve ─────────────────────────────────────────────────────────────
   const handleResolve = async (comment) => {
     try {
-      await axios.patch(`${import.meta.env.VITE_API_URL}/api/items/${id}/resolve`, { resolveComment: comment })
+      await axios.patch(`${import.meta.env.VITE_API_URL}api/items/${id}/resolve`, { resolveComment: comment })
       setItem(prev => ({ ...prev, status: "resolved", resolveComment: comment }))
       setShowResolve(false)
     } catch (err) {

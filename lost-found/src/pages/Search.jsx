@@ -89,8 +89,8 @@ export default function Search() {
 
   useEffect(() => {
     Promise.allSettled([
-      axios.get(`${import.meta.env.VITE_API_URL}/api/items`),
-      axios.get(`${import.meta.env.VITE_API_URL}/api/claims`),
+      axios.get(`${import.meta.env.VITE_API_URL}api/items`),
+      axios.get(`${import.meta.env.VITE_API_URL}api/claims`),
     ]).then(([ir, cr]) => {
       if (ir.status === "fulfilled") setItems(ir.value.data)
       if (cr.status === "fulfilled") setClaims(cr.value.data)
