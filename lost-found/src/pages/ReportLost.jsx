@@ -72,7 +72,7 @@ export default function ReportLost() {
 
     setSubmitting(true)
     try {
-      const res = await axios.post('${import.meta.env.VITE_API_URL}/api/items', fd, {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/items`, fd, {
         headers: { "Content-Type": "multipart/form-data" }
       })
       setSubmittedId(res.data.item._id)

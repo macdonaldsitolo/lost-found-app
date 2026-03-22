@@ -13,7 +13,7 @@ export function AdminAuthProvider({ children }) {
     if (!stored) { setLoading(false); return }
 
     // Verify with server — don't trust storage alone
-    axios.get("http://localhost:5000/api/admin/auth/me", {
+    axios.get(`${import.meta.env.VITE_API_URL}/api/admin/auth/me`, {
       headers: { Authorization: `Bearer ${stored}` }
     })
       .then(res => setAdmin(res.data))

@@ -62,7 +62,7 @@ export default function Login() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await axios.post('${import.meta.env.VITE_API_URL}/api/auth/google', { idToken: response.credential })
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/google`, { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
@@ -75,7 +75,7 @@ export default function Login() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      const res = await axios.post('${import.meta.env.VITE_API_URL}/api/auth/login', { email, password })
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { email, password })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
