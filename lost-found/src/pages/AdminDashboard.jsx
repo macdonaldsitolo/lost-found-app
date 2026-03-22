@@ -8,7 +8,7 @@ import {
 } from "react-icons/fi"
 import { useAdminAuth } from "../context/AdminAuthContext"
 
-const API = "${import.meta.env.VITE_API_URL}/api/admin"
+const API = `${import.meta.env.VITE_API_URL}/api/admin`
 const fmt = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 // ── tiny bar chart (pure SVG, no lib needed) ──────────────────────────────
@@ -409,7 +409,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CLAIMS ── */}
+        {/* ── CLAIMS ── */}1
         {tab === "claims" && (
           <div>
             <h2 style={S.pageTitle}>Claims ({claimTotal})</h2>

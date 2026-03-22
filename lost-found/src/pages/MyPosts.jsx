@@ -214,8 +214,8 @@ export default function MyPosts() {
 
   useEffect(() => {
     Promise.allSettled([
-      axios.get("${import.meta.env.VITE_API_URL}/api/items/mine"),
-      axios.get("${import.meta.env.VITE_API_URL}/api/claims/mine"),
+      axios.get('${import.meta.env.VITE_API_URL}/api/items/mine'),
+      axios.get('${import.meta.env.VITE_API_URL}/api/claims/mine'),
     ]).then(([ir, cr]) => {
       if (ir.status === "fulfilled") setItems(ir.value.data)
       if (cr.status === "fulfilled") setClaims(cr.value.data)

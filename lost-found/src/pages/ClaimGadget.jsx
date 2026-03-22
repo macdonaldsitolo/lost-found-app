@@ -64,7 +64,7 @@ export default function ClaimGadget() {
 
     setSubmitting(true)
     try {
-      await axios.post("${import.meta.env.VITE_API_URL}/api/claims", formData, {
+      await axios.post('${import.meta.env.VITE_API_URL}/api/claims', formData, {
         headers: { "Content-Type": "multipart/form-data" }
       })
 setModalVisible(true)   

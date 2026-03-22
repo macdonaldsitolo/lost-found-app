@@ -89,8 +89,8 @@ export default function Search() {
 
   useEffect(() => {
     Promise.allSettled([
-      axios.get("${import.meta.env.VITE_API_URL}/api/items"),
-      axios.get("${import.meta.env.VITE_API_URL}/api/claims"),
+      axios.get('${import.meta.env.VITE_API_URL}/api/items'),
+      axios.get('${import.meta.env.VITE_API_URL}/api/claims'),
     ]).then(([ir, cr]) => {
       if (ir.status === "fulfilled") setItems(ir.value.data)
       if (cr.status === "fulfilled") setClaims(cr.value.data)
@@ -351,7 +351,7 @@ export default function Search() {
               return (
                 <div className="card" key={`claim-${claim._id}`}>
                   {claim.images?.length > 0 ? (
-                    <img src={`http://localhost:5000/uploads/${claim.images[0]}`} alt="" />
+                    <img src={`${import.meta.env.VITE_API_URL}/uploads/${claim.images[0]}`} alt="" />
                   ) : (
                     <div className="card-no-image"
                       style={{display:"flex",alignItems:"center",justifyContent:"center",background:"#f2f3f7"}}>

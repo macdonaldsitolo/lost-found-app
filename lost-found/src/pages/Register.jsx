@@ -72,7 +72,7 @@ export default function Register() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await axios.post("${import.meta.env.VITE_API_URL}/api/auth/google", { idToken: response.credential })
+      const res = await axios.post('${import.meta.env.VITE_API_URL}/api/auth/google', { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate("/", { replace: true })
     } catch (err) {
@@ -89,7 +89,7 @@ export default function Register() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await axios.post("${import.meta.env.VITE_API_URL}/api/auth/register", {
+      await axios.post('${import.meta.env.VITE_API_URL}/api/auth/register', {
         firstName, lastName, email,
         phone: phone || "",
         password
