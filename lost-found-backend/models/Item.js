@@ -17,13 +17,19 @@ const ItemSchema = new mongoose.Schema({
   extraFields: { type: Object, default: {} },
 
   status: {
-    type: String,
-    enum: ["active", "resolved"],
+    type:    String,
+    enum:    ["active", "resolved"],
     default: "active"
   },
 
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },  // ← NEW
+  resolveComment: { type: String },
 
+  // ── Engagement ──────────────────────────────
+  views:  { type: Number, default: 0 },
+  shares: { type: Number, default: 0 },
+  cares:  [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   createdAt: { type: Date, default: Date.now }
 })
 

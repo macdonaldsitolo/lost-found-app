@@ -197,44 +197,64 @@ router.post("/items/bulk", adminMW, uploadXlsx.single("file"), async (req, res) 
 
     const wb   = XLSX.read(req.file.buffer, { type: "buffer" })
     const ws   = wb.Sheets[wb.SheetNames[0]]
+
+    // Read with header row — skip the instructions row (row 2) if present
     const rows = XLSX.utils.sheet_to_json(ws, { defval: "" })
 
-    if (!rows.length) return res.status(400).json({ message: "Excel file is empty" })
+    // Filter out the instructions row (contains hint text like "lost / found / missing / wanted")
+    const dataRows = rows.filter(row => {
+      const t = String(row.type || "").toLowerCase().trim()
+      return t !== "lost / found / missing / wanted" && t !== ""
+    })
+
+    if (!dataRows.length) return res.status(400).json({ message: "No data rows found. Make sure your file has a header row with: type, category, location, date, phone1, phone2, name, description, reward" })
 
     const VALID_TYPES = ["lost", "found", "missing", "wanted"]
-    const docs = []
+    const docs   = []
     const errors = []
 
-    rows.forEach((row, i) => {
-      const type  = (row.type  || "").toLowerCase().trim()
-      const phone1 = (row.phone1 || String(row.phone1 || "")).trim()
+    dataRows.forEach((row, i) => {
+      const rowNum = i + 2  // +2 because row 1 is header
+      const type   = String(row.type  || "").toLowerCase().trim()
+      const phone1 = String(row.phone1 || "").trim()
 
       if (!VALID_TYPES.includes(type)) {
-        errors.push(`Row ${i + 2}: invalid type "${row.type}"`)
+        errors.push(`Row ${rowNum}: invalid type "${row.type}" — must be one of: lost, found, missing, wanted`)
         return
       }
       if (!phone1) {
-        errors.push(`Row ${i + 2}: phone1 is required`)
+        errors.push(`Row ${rowNum}: phone1 is required`)
         return
+      }
+
+      // Parse date flexibly
+      let parsedDate
+      if (row.date) {
+        parsedDate = new Date(row.date)
+        if (isNaN(parsedDate.getTime())) parsedDate = undefined
       }
 
       docs.push({
         type,
-        category:    (row.category    || "Other").trim(),
-        location:    (row.location    || "").trim(),
-        date:        row.date ? new Date(row.date) : undefined,
-        phone1,
-        phone2:      (row.phone2      || "").trim(),
-        name:        (row.name        || "").trim(),
-        description: (row.description || "").trim(),
-        reward:      (row.reward      || "").trim(),
+        category:    String(row.category    || "Other").trim(),
+        location:    String(row.location    || "").trim(),
+        date:        parsedDate,
+        phone1:      phone1.replace(/\.0$/, ""),  // remove Excel's .0 on numbers
+        phone2:      String(row.phone2      || "").trim().replace(/\.0$/, ""),
+        name:        String(row.name        || "").trim(),
+        description: String(row.description || "").trim(),
+        reward:      String(row.reward      || "").trim(),
         extraFields: {}
       })
     })
 
+    if (!docs.length) {
+      return res.status(400).json({ message: "No valid rows to import", errors })
+    }
+
     const inserted = await Item.insertMany(docs, { ordered: false })
     res.json({
-      message:  `${inserted.length} items imported`,
+      message:  `✅ ${inserted.length} item${inserted.length !== 1 ? "s" : ""} imported successfully`,
       imported: inserted.length,
       skipped:  errors.length,
       errors,

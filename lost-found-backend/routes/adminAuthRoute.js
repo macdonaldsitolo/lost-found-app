@@ -1,10 +1,11 @@
-const express = require("express")
-const router  = express.Router()
-const bcrypt  = require("bcryptjs")
-const jwt     = require("jsonwebtoken")
-const Admin   = require("../models/Admin")
+const express  = require("express")
+const router   = express.Router()
+const bcrypt   = require("bcryptjs")
+const jwt      = require("jsonwebtoken")
+const Admin    = require("../models/Admin")
+const adminMW  = require("../middleware/adminMiddleware")
 
-// POST /api/admin/auth/login
+// ── POST /api/admin/auth/login ────────────────────────────────────────────
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body
@@ -28,6 +29,18 @@ router.post("/login", async (req, res) => {
     res.json({ token, admin: { id: admin._id, username: admin.username } })
   } catch (err) {
     console.error(err)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
+// ── GET /api/admin/me  (validates admin session) ──────────────────────────
+// Called on every browser load to verify the stored token is still valid
+router.get("/me", adminMW, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin.id).select("-passwordHash")
+    if (!admin) return res.status(404).json({ message: "Admin not found" })
+    res.json({ id: admin._id, username: admin.username })
+  } catch (err) {
     res.status(500).json({ message: "Server error" })
   }
 })

@@ -19,14 +19,23 @@ const ClaimSchema = new mongoose.Schema({
 
   images: [String],
 
-  status: {
-    type: String,
-    enum: ["pending", "verified", "rejected"],
+  // admin verification status
+  verificationStatus: {
+    type:    String,
+    enum:    ["pending", "verified", "rejected"],
     default: "pending"
   },
 
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },  // ← NEW
+  // user-controlled status
+  status: {
+    type:    String,
+    enum:    ["active", "resolved"],
+    default: "active"
+  },
 
+  resolveComment: { type: String },
+
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   createdAt: { type: Date, default: Date.now }
 })
 

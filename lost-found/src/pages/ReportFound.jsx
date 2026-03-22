@@ -1,386 +1,312 @@
-import { useState, useEffect, useRef } from "react"
-import {
-  FiUpload,
-  FiSmartphone,
-  FiMonitor,
-  FiCreditCard,
-  FiBox,
-  FiMapPin
-} from "react-icons/fi"
+import { useState } from "react"
+import { FiUpload, FiSmartphone, FiMonitor, FiCreditCard, FiBox } from "react-icons/fi"
+import SubmitModal   from "../components/SubmitModal"
 
-import SubmitModal from "../components/SubmitModal"
-import axios from "axios"
+import axios         from "axios"
+import { useAuth }   from "../context/AuthContext"
+import useValidation from "../hooks/useValidation"
+import FieldError    from "../components/FieldError"
+import { validatePhone, validatePastDate, validateRequired, validateIMEI } from "../utils/validators"
 
+const CATEGORIES = [
+  { name: "Phone",   icon: <FiSmartphone size={18} /> },
+  { name: "Laptop",  icon: <FiMonitor    size={18} /> },
+  { name: "Wallet",  icon: <FiCreditCard size={18} /> },
+  { name: "ID Card", icon: <FiCreditCard size={18} /> },
+  { name: "Other",   icon: <FiBox        size={18} /> },
+]
 
-function ReportFound() {
-  const [extraFields, setExtraFields] = useState({})
-  const [name, setName] = useState("")
-  const [phone1, setPhone1] = useState("")
-  const [phone2, setPhone2] = useState("")
-  const [images, setImages] = useState([])
-  const [category, setCategory] = useState("")
-  const [hasReward, setHasReward] = useState(false)
+export default function ReportFound() {
+  const { user } = useAuth()
+
+  const [extra,        setExtra]        = useState({})
+  const [phone1,       setPhone1]       = useState(user?.phone || "")
+  const [phone2,       setPhone2]       = useState("")
+  const [images,       setImages]       = useState([])
+  const [category,     setCategory]     = useState("")
+  const [hasReward,    setHasReward]    = useState(false)
+  const [reward,       setReward]       = useState("")
+  const [description,  setDescription]  = useState("")
+  const [date,         setDate]         = useState("")
+  const [location,     setLocation]     = useState("")
   const [modalVisible, setModalVisible] = useState(false)
-  const [description, setDescription] = useState("")
-  const [reward, setReward] = useState("")
-  const [dateFound, setDateFound] = useState("")
-
-  const locationRef = useRef(null)
+  const [submittedId,  setSubmittedId]  = useState(null)
+  const [submitting,   setSubmitting]   = useState(false)
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files)
-    const previews = files.map(file => ({
-      file,
-      url: URL.createObjectURL(file)
-    }))
-    setImages(previews)
+    setImages(files.map(f => ({ file: f, url: URL.createObjectURL(f) })))
   }
 
-const handleExtraChange = (key, value) => {
-  setExtraFields(prev => ({
-    ...prev,
-    [key]: value
-  }))
-}
+  const set = (k, v) => setExtra(p => ({ ...p, [k]: v }))
+
+  const { errors, touched, validateAll } = useValidation({
+    category: () => validateRequired(category, "Category"),
+    phone1:   () => validatePhone(phone1),
+    phone2:   () => validatePhone(phone2, false),
+    date:     () => validatePastDate(date, false),
+    imei:     () => category === "Phone" && extra.imei ? validateIMEI(extra.imei, false) : null,
+  })
 
   const submit = async () => {
+    if (!validateAll()) return
 
-  if (!phone1) {
-    alert("Phone number is required")
-    return
+    let itemName = ""
+    if (category === "Phone")   itemName = extra.phoneName  || "Phone"
+    if (category === "Laptop")  itemName = extra.laptopName || "Laptop"
+    if (category === "Wallet")  itemName = `${extra.color || ""} Wallet`.trim()
+    if (category === "ID Card") itemName = extra.idType     || "ID Card"
+    if (category === "Other")   itemName = extra.itemName   || "Item"
+
+    const fd = new FormData()
+    fd.append("type",        "found")
+    fd.append("category",    category)
+    fd.append("description", description)
+    fd.append("location",    location)
+    fd.append("date",        date)
+    fd.append("reward",      reward)
+    fd.append("phone1",      phone1)
+    fd.append("phone2",      phone2)
+    images.forEach(img => fd.append("images", img.file))
+    fd.append("extraFields", JSON.stringify({ ...extra, itemName }))
+
+    setSubmitting(true)
+    try {
+      const res = await axios.post("http://localhost:5000/api/items", fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      })
+      setSubmittedId(res.data.item._id)
+      setModalVisible(true)
+    } catch (err) {
+      alert(err?.response?.data?.message || "Error submitting report")
+    } finally {
+      setSubmitting(false)
+    }
   }
-
-  if (!category) {
-    alert("Please select a category")
-    return
-  }
-
-  // ✅ CREATE PROPER ITEM NAME
-  let itemName = ""
-
-  if (category === "Phone") {
-    itemName = extraFields.phoneName || "Phone"
-  } else if (category === "Laptop") {
-    itemName = `${extraFields.brand || ""} ${extraFields.model || ""}`.trim()
-  } else if (category === "Wallet") {
-    itemName = `${extraFields.color || ""} Wallet`.trim()
-  } else if (category === "ID Card") {
-    itemName = extraFields.idType || "ID Card"
-  } else if (category === "Other") {
-    itemName = extraFields.itemName || "Item"
-  }
-
-  const finalExtraFields = {
-    ...extraFields,
-    itemName // ✅ THIS IS THE FIX
-  }
-
-  const formData = new FormData()
-
-  formData.append("type", "found")
-  formData.append("category", category)
-  formData.append("description", description)
-  formData.append("location", locationRef.current?.value || "")
-  formData.append("date", dateFound)
-  formData.append("reward", reward)
-  formData.append("name", name)
-  formData.append("phone1", phone1)
-  formData.append("phone2", phone2)
-
-  images.forEach(img => {
-    formData.append("images", img.file)
-  })
-  formData.append("extraFields", JSON.stringify(finalExtraFields))
-
-
-  try {
-    await axios.post(
-      "http://localhost:5000/api/items",
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    )
-
-    setModalVisible(true)
-
-  } catch (err) {
-    console.error(err)
-    alert("Error submitting report")
-  }
-}
-
-  const categories = [
-    { name: "Phone", icon: <FiSmartphone size={22} /> },
-    { name: "Laptop", icon: <FiMonitor size={22} /> },
-    { name: "Wallet", icon: <FiCreditCard size={22} /> },
-    { name: "ID Card", icon: <FiCreditCard size={22} /> },
-    { name: "Other", icon: <FiBox size={22} /> }
-  ]
 
   return (
-    <div style={styles.screen}>
+    <div style={S.screen}>
+      <div style={S.container}>
+        <h2 style={S.title}>Report Item Found</h2>
 
-      <div style={styles.container}>
-
-        <h2 style={styles.title}>Report Item Found</h2>
-
-        <label style={styles.photoCard}>
-          {images.length > 0 ? (
-            <img src={images[0].url} alt="" style={styles.photoPreview} />
-          ) : (
-            <>
-              <FiUpload size={28} color="#6e6e73" />
-              <p style={{ marginTop: 10 }}>Tap to Upload Photos</p>
-            </>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImages}
-            style={{ display: "none" }}
-          />
+        <label style={S.photoCard}>
+          {images.length > 0
+            ? <img src={images[0].url} alt="" style={S.photoPreview} />
+            : <><FiUpload size={22} color="#9ca3af" /><span style={S.photoHint}>Upload photo</span></>}
+          <input type="file" accept="image/*" onChange={handleImages} style={{ display: "none" }} />
         </label>
 
-        <div style={styles.section}>
-          <p style={styles.sectionTitle}>Category</p>
-
-          <div style={styles.categoryGrid}>
-            {categories.map((item) => (
-              <div
-                key={item.name}
-                onClick={() => setCategory(item.name)}
-                style={{
-                  ...styles.categoryCard,
-                  backgroundColor:
-                    category === item.name ? "#007aff" : "white",
-                  color:
-                    category === item.name ? "white" : "#1c1c1e"
-                }}
-              >
-                {item.icon}
-                <span style={{ marginTop: 6 }}>{item.name}</span>
-              </div>
+        <div style={S.field}>
+          <label style={S.label}>Category *</label>
+          <div style={S.pills}>
+            {CATEGORIES.map(c => (
+              <button key={c.name} type="button"
+                onClick={() => setCategory(c.name)}
+                style={{ ...S.pill, ...(category === c.name ? S.pillActive : {}) }}>
+                {c.icon} {c.name}
+              </button>
             ))}
           </div>
+          <FieldError error={errors.category} touched={touched.category} />
         </div>
+
         {category === "Phone" && (
-  <div style={styles.section}>
-    <p style={styles.sectionTitle}>Phone Details</p>
+          <div style={S.card}>
+            <p style={S.cardTitle}>Phone Details</p>
+            <div style={S.twoCol}>
+              <div style={S.field}>
+                <label style={S.label}>Phone name</label>
+                <input style={S.input} placeholder="e.g. iPhone 14"
+                  onChange={e => set("phoneName", e.target.value)} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>IMEI if visible</label>
+                <input style={S.input} placeholder="15 digits"
+                  onChange={e => set("imei", e.target.value)} />
+                <FieldError error={errors.imei} touched={touched.imei} />
+              </div>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Other details</label>
+              <input style={S.input} placeholder="Color, condition…"
+                onChange={e => set("specs", e.target.value)} />
+            </div>
+          </div>
+        )}
 
-    <input placeholder="Phone Name (e.g. iPhone 11)"
-      onChange={(e)=>handleExtraChange("phoneName", e.target.value)} />
+        {category === "Laptop" && (
+          <div style={S.card}>
+            <p style={S.cardTitle}>Laptop Details</p>
+            <div style={S.twoCol}>
+              <div style={S.field}>
+                <label style={S.label}>Laptop name</label>
+                <input style={S.input} placeholder="e.g. Dell XPS 15"
+                  onChange={e => set("laptopName", e.target.value)} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Serial if visible</label>
+                <input style={S.input} placeholder="Optional"
+                  onChange={e => set("serial", e.target.value)} />
+              </div>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Other details</label>
+              <input style={S.input} placeholder="Color, stickers…"
+                onChange={e => set("specs", e.target.value)} />
+            </div>
+          </div>
+        )}
 
-    <input placeholder="Model"
-      onChange={(e)=>handleExtraChange("model", e.target.value)} />
+        {category === "Wallet" && (
+          <div style={S.card}>
+            <p style={S.cardTitle}>Wallet Details</p>
+            <div style={S.twoCol}>
+              <div style={S.field}>
+                <label style={S.label}>Color</label>
+                <input style={S.input} onChange={e => set("color", e.target.value)} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Brand</label>
+                <input style={S.input} onChange={e => set("brand", e.target.value)} />
+              </div>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Visible contents</label>
+              <input style={S.input} placeholder="IDs, cards visible…"
+                onChange={e => set("contents", e.target.value)} />
+            </div>
+          </div>
+        )}
 
-    <input placeholder="IMEI (optional)"
-      onChange={(e)=>handleExtraChange("imei", e.target.value)} />
+        {category === "ID Card" && (
+          <div style={S.card}>
+            <p style={S.cardTitle}>ID Card Details</p>
+            <div style={S.twoCol}>
+              <div style={S.field}>
+                <label style={S.label}>ID type</label>
+                <select style={S.input} onChange={e => set("idType", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option>National ID</option>
+                  <option>School ID</option>
+                  <option>MANEB</option>
+                  <option>Passport</option>
+                  <option>Driver's Licence</option>
+                </select>
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Name on ID</label>
+                <input style={S.input} onChange={e => set("fullName", e.target.value)} />
+              </div>
+            </div>
+          </div>
+        )}
 
-    <input placeholder="MAC Address (optional)"
-      onChange={(e)=>handleExtraChange("mac", e.target.value)} />
+        {category === "Other" && (
+          <div style={S.card}>
+            <p style={S.cardTitle}>Item Details</p>
+            <div style={S.twoCol}>
+              <div style={S.field}>
+                <label style={S.label}>Item name</label>
+                <input style={S.input} onChange={e => set("itemName", e.target.value)} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Description</label>
+                <input style={S.input} placeholder="Identifying details"
+                  onChange={e => set("specs", e.target.value)} />
+              </div>
+            </div>
+          </div>
+        )}
 
-    <textarea placeholder="Specifications"
-      style={styles.textarea}
-      onChange={(e)=>handleExtraChange("specs", e.target.value)} />
-  </div>
-)}
-
-{category === "Laptop" && (
-  <div style={styles.section}>
-    <p style={styles.sectionTitle}>Laptop Details</p>
-
-    <input placeholder="Brand (e.g. HP, Dell)"
-      onChange={(e)=>handleExtraChange("brand", e.target.value)} />
-
-    <input placeholder="Model"
-      onChange={(e)=>handleExtraChange("model", e.target.value)} />
-
-    <input placeholder="Serial Number"
-      onChange={(e)=>handleExtraChange("serial", e.target.value)} />
-
-    <textarea placeholder="Specifications"
-      style={styles.textarea}
-      onChange={(e)=>handleExtraChange("specs", e.target.value)} />
-  </div>
-)}
-
-{category === "Wallet" && (
-  <div style={styles.section}>
-    <p style={styles.sectionTitle}>Wallet Details</p>
-
-    <input placeholder="Color"
-      onChange={(e)=>handleExtraChange("color", e.target.value)} />
-
-    <input placeholder="Brand"
-      onChange={(e)=>handleExtraChange("brand", e.target.value)} />
-
-    <textarea placeholder="Contents (IDs, cash, cards...)"
-      style={styles.textarea}
-      onChange={(e)=>handleExtraChange("contents", e.target.value)} />
-  </div>
-)}
-
-{category === "ID Card" && (
-  <div style={styles.section}>
-    <p style={styles.sectionTitle}>ID Details</p>
-
-    <select
-      onChange={(e)=>handleExtraChange("idType", e.target.value)}
-      style={styles.inputHalf}
-    >
-      <option value="">Select ID Type</option>
-      <option>National ID</option>
-      <option>School ID</option>
-      <option>MANEB</option>
-      <option>Passport</option>
-      <option>Driver's Licence</option>
-    </select>
-
-    <input placeholder="Full Name on ID"
-      onChange={(e)=>handleExtraChange("fullName", e.target.value)} />
-
-    <input placeholder="First digits of ID number"
-      onChange={(e)=>handleExtraChange("idNumberStart", e.target.value)} />
-  </div>
-)}
-
-{category === "Other" && (
-  <div style={styles.section}>
-    <p style={styles.sectionTitle}>Item Details</p>
-
-    <input placeholder="Item Name"
-      onChange={(e)=>handleExtraChange("itemName", e.target.value)} />
-
-    <textarea placeholder="Item Specifications"
-      style={styles.textarea}
-      onChange={(e)=>handleExtraChange("specs", e.target.value)} />
-  </div>
-)}
-
-
-        <div style={styles.section}>
-          <p style={styles.sectionTitle}>Where Was It Found?</p>
-
-          <div style={styles.locationWrapper}>
-            <FiMapPin style={{ marginRight: 8 }} />
-            <input
-              ref={locationRef}
-              type="text"
-              placeholder="Type in the location you found it..."
-              style={styles.locationInput}
-            />
+        <div style={S.twoColField}>
+          <div style={S.field}>
+            <label style={S.label}>Where was it found?</label>
+            <input style={S.input} placeholder="e.g. Blantyre, Area 25, Lilongwe CBD…" value={location} onChange={e => setLocation(e.target.value)} />
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Date found</label>
+            <input type="date" style={{ ...S.input, width: "auto" }}
+              value={date}
+              max={new Date().toISOString().split("T")[0]}
+              onChange={e => setDate(e.target.value)} />
+            <FieldError error={errors.date} touched={touched.date} />
           </div>
         </div>
 
-        <div style={styles.section}>
-          <p style={styles.sectionTitle}>When Was It Found?</p>
+        <div style={S.field}>
+          <label style={S.label}>Additional description</label>
+          <textarea style={S.textarea}
+            placeholder="Any other details about where and how it was found…"
+            value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
 
-          <div style={styles.row}>
-            <input type="date"
-  style={styles.inputHalf}
-  value={dateFound}
-  onChange={(e)=>setDateFound(e.target.value)}
-/>
-            <input type="time" style={styles.inputHalf} />
+        <div style={S.card}>
+          <p style={S.cardTitle}>
+            Contact {user?.phone && <span style={S.prefill}>pre-filled</span>}
+          </p>
+          <div style={S.twoCol}>
+            <div style={S.field}>
+              <label style={S.label}>Primary phone *</label>
+              <input type="tel" style={S.input} value={phone1}
+                onChange={e => setPhone1(e.target.value)} />
+              <FieldError error={errors.phone1} touched={touched.phone1} />
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Second phone</label>
+              <input type="tel" style={S.input} value={phone2}
+                onChange={e => setPhone2(e.target.value)} />
+              <FieldError error={errors.phone2} touched={touched.phone2} />
+            </div>
           </div>
         </div>
 
-        <div style={styles.section}>
-          <p style={styles.sectionTitle}>Special Description</p>
-          <textarea
-  placeholder="Describe the item in your own words..."
-  style={styles.textarea}
-  value={description}
-  onChange={(e)=>setDescription(e.target.value)}
-/>
-        </div>
-
-        <input
-  type="text"
-  placeholder="Your Name"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-/>
-
-<input
-  type="tel"
-  placeholder="Phone Number *"
-  value={phone1}
-  onChange={(e) => setPhone1(e.target.value)}
-/>
-
-<input
-  type="tel"
-  placeholder="Second Phone Number"
-  value={phone2}
-  onChange={(e) => setPhone2(e.target.value)}
-/>
-
-        <div style={styles.section}>
-          <p style={styles.sectionTitle}>Reward</p>
-
-          <div style={styles.rewardToggle}>
-            <input
-              type="checkbox"
-              checked={hasReward}
-              onChange={() => setHasReward(!hasReward)}
-            />
-            <span style={{ marginLeft: 10 }}>
-              I will require a reward
-            </span>
-          </div>
-
+        <div style={S.field}>
+          <label style={S.checkLabel}>
+            <input type="checkbox" checked={hasReward} onChange={() => setHasReward(!hasReward)} />
+            <span>Require a reward for returning this item</span>
+          </label>
           {hasReward && (
-            <textarea
-  placeholder="Describe the reward (optional)"
-  style={{ ...styles.textarea, marginTop: 12 }}
-  value={reward}
-  onChange={(e)=>setReward(e.target.value)}
-/>
+            <textarea style={{ ...S.textarea, marginTop: 8 }}
+              placeholder="Describe the reward…"
+              value={reward} onChange={e => setReward(e.target.value)} />
           )}
         </div>
 
-        
-
       </div>
 
-      <div style={styles.footer}>
-        <div style={styles.footerInner}>
-          <button onClick={submit} style={styles.submitBtn}>
-            Submit Report
-          </button>
-        </div>
+      <div style={S.footer}>
+        <button onClick={submit} disabled={submitting}
+          style={{ ...S.submitBtn, opacity: submitting ? 0.7 : 1 }}>
+          {submitting ? "Submitting…" : "Submit Report"}
+        </button>
       </div>
-    
-      <SubmitModal
-        visible={modalVisible}
-        type="found"
-         category={category}
-        onClose={() => setModalVisible(false)}
-      />
 
+      <SubmitModal visible={modalVisible} type="found" category={category}
+        itemId={submittedId} onClose={() => setModalVisible(false)} />
     </div>
   )
 }
 
-const styles = {
-  screen:{backgroundColor:"#f2f2f7",minHeight:"100vh",display:"flex",justifyContent:"center"},
-  container:{width:"100%",maxWidth:"480px",padding:"30px 20px 120px"},
-  title:{fontSize:"24px",fontWeight:600,marginBottom:"25px"},
-  photoCard:{height:"180px",borderRadius:"22px",backgroundColor:"white",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",marginBottom:"30px",boxShadow:"0 8px 20px rgba(0,0,0,0.05)"},
-  photoPreview:{width:"100%",height:"100%",objectFit:"cover"},
-  section:{marginBottom:"28px"},
-  sectionTitle:{fontSize:"14px",color:"#6e6e73",marginBottom:"12px"},
-  categoryGrid:{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"12px"},
-  categoryCard:{padding:"16px 10px",borderRadius:"18px",backgroundColor:"white",display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",fontSize:"13px",fontWeight:500,boxShadow:"0 6px 15px rgba(0,0,0,0.04)"},
-  locationWrapper:{display:"flex",alignItems:"center",backgroundColor:"white",padding:"14px",borderRadius:"16px",boxShadow:"0 6px 15px rgba(0,0,0,0.04)"},
-  locationInput:{border:"none",outline:"none",width:"100%",fontSize:"14px"},
-  row:{display:"flex",gap:"12px"},
-  inputHalf:{flex:1,padding:"14px",borderRadius:"16px",border:"none",backgroundColor:"white",fontSize:"14px",boxShadow:"0 6px 15px rgba(0,0,0,0.04)"},
-  rewardToggle:{display:"flex",alignItems:"center",fontSize:"14px"},
-  textarea:{width:"100%",padding:"14px",borderRadius:"18px",border:"none",backgroundColor:"white",minHeight:"100px",fontSize:"14px",boxShadow:"0 6px 15px rgba(0,0,0,0.04)"},
-  footer:{position:"fixed",bottom:0,left:0,right:0,display:"flex",justifyContent:"center",backgroundColor:"#f2f2f7",padding:"16px"},
-  footerInner:{width:"100%",maxWidth:"480px"},
-  submitBtn:{width:"100%",padding:"18px",borderRadius:"28px",border:"none",backgroundColor:"#007aff",color:"white",fontSize:"16px",fontWeight:600,cursor:"pointer",boxShadow:"0 10px 25px rgba(0,122,255,0.3)"}
+const S = {
+  screen:       { backgroundColor: "#f2f2f7", minHeight: "100vh" },
+  container:    { maxWidth: 560, margin: "0 auto", padding: "24px 18px 100px" },
+  title:        { fontSize: 22, fontWeight: 700, color: "#1c1c1e", marginBottom: 18 },
+  photoCard:    { height: 100, borderRadius: 14, backgroundColor: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", marginBottom: 18, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", gap: 10 },
+  photoPreview: { width: "100%", height: "100%", objectFit: "cover" },
+  photoHint:    { fontSize: 13, color: "#9ca3af" },
+  field:        { marginBottom: 14 },
+  label:        { display: "block", fontSize: 11, fontWeight: 700, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" },
+  prefill:      { fontSize: 10, background: "#eef2ff", color: "#0a4d8c", padding: "1px 6px", borderRadius: 8, marginLeft: 8, fontWeight: 600, textTransform: "none", letterSpacing: 0 },
+  pills:        { display: "flex", flexWrap: "wrap", gap: 8 },
+  pill:         { display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "1.5px solid #e5e7eb", background: "white", fontSize: 13, fontWeight: 600, color: "#6e6e73", cursor: "pointer", transition: "0.15s" },
+  pillActive:   { background: "#0a4d8c", borderColor: "#0a4d8c", color: "white" },
+  card:         { background: "white", borderRadius: 16, padding: "14px 16px", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" },
+  cardTitle:    { fontSize: 13, fontWeight: 700, color: "#1c1c1e", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 },
+  twoCol:       { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  twoColField:  { display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 },
+  input:        { width: "100%", padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: 14, background: "white", outline: "none", boxSizing: "border-box", color: "#1c1c1e" },
+  textarea:     { width: "100%", padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: 14, background: "white", outline: "none", minHeight: 72, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" },
+  checkLabel:   { display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", color: "#1c1c1e" },
+  footer:       { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 18px", background: "#f2f2f7", display: "flex", justifyContent: "center" },
+  submitBtn:    { width: "100%", maxWidth: 560, padding: 15, borderRadius: 22, border: "none", background: "#007aff", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 18px rgba(0,122,255,0.28)" },
 }
-
-export default ReportFound

@@ -7,23 +7,37 @@ const path     = require("path")
 dotenv.config()
 
 const app = express()
-app.use(cors())
+
+// ── CORS — explicit config so Chrome and Edge behave identically ──────────
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}))
+
 app.use(express.json())
 app.use("/uploads", express.static(path.join(__dirname, "uploads")))
 
-// Routes
-const itemsRoute      = require("./routes/itemsRoute")
-const claimsRoute     = require("./routes/claimsRoute")
-const authRoutes      = require("./routes/authRoutes")
-const adminAuthRoute  = require("./routes/adminAuthRoute")
-const adminRoutes     = require("./routes/adminRoutes")
+// ── Routes ────────────────────────────────────────────────────────────────
+const itemsRoute     = require("./routes/itemsRoute")
+const claimsRoute    = require("./routes/claimsRoute")
+const authRoutes     = require("./routes/authRoutes")
+const adminAuthRoute = require("./routes/adminAuthRoute")
+const adminRoutes    = require("./routes/AdminRoutes")
 
-app.use("/api/items",       itemsRoute)
-app.use("/api/claims",      claimsRoute)
-app.use("/api/auth",        authRoutes)
-app.use("/api/admin/auth",  adminAuthRoute)
-app.use("/api/admin",       adminRoutes)
+app.use("/api/items",      itemsRoute)
+app.use("/api/claims",     claimsRoute)
+app.use("/api/auth",       authRoutes)
+app.use("/api/admin/auth", adminAuthRoute)   // login + /me lives here at /api/admin/auth/me
+app.use("/api/admin",      adminRoutes)      // all other admin CRUD
 
+// ── MongoDB ───────────────────────────────────────────────────────────────
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))

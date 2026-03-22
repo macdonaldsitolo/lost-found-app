@@ -7,7 +7,10 @@ export default function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        minHeight: "60vh"
+      }}>
         <div style={{
           width: 32, height: 32,
           border: "3px solid #e5e7eb",
@@ -20,7 +23,6 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    // Save where they were trying to go so we can redirect after login
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 

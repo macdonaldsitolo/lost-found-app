@@ -3,17 +3,16 @@ import { Link, useNavigate, useLocation } from "react-router-dom"
 import axios from "axios"
 import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
+import useValidation from "../hooks/useValidation"
+import FieldError, { inputErrorStyle } from "../components/FieldError"
+import { validateEmail, validateRequired } from "../utils/validators"
 
 function initGoogleButton(ref, callback) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   if (!clientId || !window.google?.accounts?.id || !ref) return false
-  window.google.accounts.id.initialize({
-    client_id: clientId,
-    callback,
-    ux_mode: "popup",
-  })
+  window.google.accounts.id.initialize({ client_id: clientId, callback, ux_mode: "popup" })
   window.google.accounts.id.renderButton(ref, {
-    theme: "outline", size: "large", width: 350, text: "signin_with", shape: "rectangular",
+    theme: "outline", size: "large", width: 350, text: "signin_with", shape: "rectangular"
   })
   return true
 }
@@ -33,24 +32,23 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => { if (user) navigate(from, { replace: true }) }, [user])
-
   useEffect(() => {
-    if (location.search.includes("verified=1"))
-      setSuccess("Email verified! You can now log in.")
+    if (location.search.includes("verified=1")) setSuccess("Email verified! You can now log in.")
   }, [])
+
+  const { errors, touched, touch, validateAll } = useValidation({
+    email:    () => validateEmail(email),
+    password: () => validateRequired(password, "Password"),
+  })
 
   useEffect(() => {
     if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return
-
     if (initGoogleButton(googleRef.current, handleGoogleResponse)) return
-
     const existing = document.getElementById("google-gsi-script")
     if (!existing) {
-      const script  = document.createElement("script")
-      script.id     = "google-gsi-script"
-      script.src    = "https://accounts.google.com/gsi/client"
-      script.async  = true
-      script.defer  = true
+      const script = document.createElement("script")
+      script.id = "google-gsi-script"; script.src = "https://accounts.google.com/gsi/client"
+      script.async = true; script.defer = true
       script.onload = () => initGoogleButton(googleRef.current, handleGoogleResponse)
       document.head.appendChild(script)
     } else {
@@ -68,13 +66,13 @@ export default function Login() {
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err?.response?.data?.message || "Google sign-in failed. Please try again.")
+      setError(err?.response?.data?.message || "Google sign-in failed.")
     }
   }
 
   const handleSubmit = async () => {
     setError("")
-    if (!email || !password) { setError("Please fill in all fields"); return }
+    if (!validateAll()) return
     setSubmitting(true)
     try {
       const res = await axios.post("http://localhost:5000/api/auth/login", { email, password })
@@ -90,7 +88,6 @@ export default function Login() {
   return (
     <div style={S.screen}>
       <div style={S.container}>
-
         <div style={S.header}>
           <div style={S.logo}>🔍</div>
           <h2 style={S.title}>Welcome back</h2>
@@ -98,9 +95,8 @@ export default function Login() {
         </div>
 
         {success && <div style={S.successBanner}><FiCheckCircle size={16} /> {success}</div>}
-        {error   && <div style={S.errorBanner}><FiAlertCircle size={16} /> {error}</div>}
+        {error   && <div style={S.errorBanner}><FiAlertCircle  size={16} /> {error}</div>}
 
-        {/* Google button — hidden entirely if client ID not configured */}
         {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
           <>
             <div style={S.googleWrap}><div ref={googleRef} /></div>
@@ -112,47 +108,39 @@ export default function Login() {
           </>
         )}
 
-        <div style={S.inputWrap}>
-          <FiMail style={S.inputIcon} />
-          <input
-            style={S.input}
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSubmit()}
-          />
-        </div>
+        <input
+          style={inputErrorStyle(errors.email, touched.email, S.input)}
+          type="email" placeholder="Email address"
+          value={email}
+          onChange={e => { setEmail(e.target.value); touch("email") }}
+          onKeyDown={e => e.key === "Enter" && handleSubmit()}
+        />
+        <FieldError error={errors.email} touched={touched.email} />
 
-        <div style={S.inputWrap}>
-          <FiLock style={S.inputIcon} />
+        <div style={S.passWrap}>
           <input
-            style={S.input}
-            type={showPass ? "text" : "password"}
-            placeholder="Password"
+            style={inputErrorStyle(errors.password, touched.password, S.input)}
+            type={showPass ? "text" : "password"} placeholder="Password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={e => { setPassword(e.target.value); touch("password") }}
             onKeyDown={e => e.key === "Enter" && handleSubmit()}
           />
           <button style={S.eyeBtn} onClick={() => setShowPass(p => !p)}>
             {showPass ? <FiEyeOff size={16} /> : <FiEye size={16} />}
           </button>
         </div>
+        <FieldError error={errors.password} touched={touched.password} />
 
-        {/* ← Sign In button was missing before — it's here now */}
         <button
           style={{ ...S.submitBtn, opacity: submitting ? 0.7 : 1 }}
-          onClick={handleSubmit}
-          disabled={submitting}
+          onClick={handleSubmit} disabled={submitting}
         >
           {submitting ? "Signing in…" : "Sign In"}
         </button>
 
         <p style={S.footer}>
-          Don't have an account?{" "}
-          <Link to="/register" style={S.link}>Sign up</Link>
+          Don't have an account? <Link to="/register" style={S.link}>Sign up</Link>
         </p>
-
       </div>
     </div>
   )
@@ -171,10 +159,9 @@ const S = {
   dividerRow:    { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 },
   dividerLine:   { flex: 1, height: 1, background: "#e5e7eb" },
   dividerText:   { color: "#9ca3af", fontSize: 13 },
-  inputWrap:     { position: "relative", marginBottom: 14 },
-  inputIcon:     { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none" },
-  input:         { width: "100%", padding: "14px 14px 14px 42px", borderRadius: 16, border: "1.5px solid #e5e7eb", fontSize: 15, background: "white", outline: "none", boxSizing: "border-box", margin: 0 },
-  eyeBtn:        { position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0 },
+  input:         { width: "100%", padding: "14px", borderRadius: 16, border: "1.5px solid #e5e7eb", fontSize: 15, background: "white", outline: "none", boxSizing: "border-box", margin: "0 0 4px" },
+  passWrap:      { position: "relative" },
+  eyeBtn:        { position: "absolute", right: 14, top: 16, background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0 },
   submitBtn:     { width: "100%", padding: 16, borderRadius: 18, border: "none", background: "#0a4d8c", color: "white", fontSize: 16, fontWeight: 600, cursor: "pointer", marginBottom: 20, boxShadow: "0 8px 20px rgba(10,77,140,0.25)" },
   footer:        { textAlign: "center", fontSize: 14, color: "#6e6e73" },
   link:          { color: "#0a4d8c", fontWeight: 600, textDecoration: "none" },
