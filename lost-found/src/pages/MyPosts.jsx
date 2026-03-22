@@ -100,7 +100,7 @@ function ShareModal({ item, onClose }) {
         {/* Mini card preview */}
         <div style={{ border: `1.5px solid ${tc.border || "#e5e7eb"}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
           {item.images?.length > 0 ? (
-            <img src={`http://localhost:5000/uploads/${item.images[0]}`} alt=""
+            <img src={`${import.meta.env.VITE_API_URL}/uploads/${item.images[0]}`} alt=""
               style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
           ) : (
             <div style={{ height: 60, background: tc.bg }} />
@@ -214,8 +214,8 @@ export default function MyPosts() {
 
   useEffect(() => {
     Promise.allSettled([
-      axios.get("http://localhost:5000/api/items/mine"),
-      axios.get("http://localhost:5000/api/claims/mine"),
+      axios.get("${import.meta.env.VITE_API_URL}/api/items/mine"),
+      axios.get("${import.meta.env.VITE_API_URL}/api/claims/mine"),
     ]).then(([ir, cr]) => {
       if (ir.status === "fulfilled") setItems(ir.value.data)
       if (cr.status === "fulfilled") setClaims(cr.value.data)
@@ -226,7 +226,7 @@ export default function MyPosts() {
   const handleItemResolve = async (comment) => {
     const item = resolveTarget.data
     try {
-      await axios.patch(`http://localhost:5000/api/items/${item._id}/resolve`, { resolveComment: comment })
+      await axios.patch(`${import.meta.env.VITE_API_URL}/api/items/${item._id}/resolve`, { resolveComment: comment })
       setItems(prev => prev.map(i => i._id === item._id ? { ...i, status: "resolved", resolveComment: comment } : i))
     } catch (err) { alert(err?.response?.data?.message || "Error") }
     setResolveTarget(null)
@@ -236,7 +236,7 @@ export default function MyPosts() {
   const handleClaimResolve = async (comment) => {
     const claim = resolveTarget.data
     try {
-      await axios.patch(`http://localhost:5000/api/claims/${claim._id}/resolve`, { resolveComment: comment })
+      await axios.patch(`${import.meta.env.VITE_API_URL}/api/claims/${claim._id}/resolve`, { resolveComment: comment })
       setClaims(prev => prev.map(c => c._id === claim._id ? { ...c, status: "resolved", resolveComment: comment } : c))
     } catch (err) { alert(err?.response?.data?.message || "Error") }
     setResolveTarget(null)
@@ -245,7 +245,7 @@ export default function MyPosts() {
   // ── claim delete ──────────────────────────────────────────────────────
   const handleClaimDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/claims/${deleteTarget._id}`)
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/claims/${deleteTarget._id}`)
       setClaims(prev => prev.filter(c => c._id !== deleteTarget._id))
     } catch (err) { alert(err?.response?.data?.message || "Error") }
     setDeleteTarget(null)
@@ -254,7 +254,7 @@ export default function MyPosts() {
   // ── claim edit save ───────────────────────────────────────────────────
   const handleClaimEditSave = async (fields) => {
     try {
-      const res = await axios.patch(`http://localhost:5000/api/claims/${editClaim._id}`, fields)
+      const res = await axios.patch(`${import.meta.env.VITE_API_URL}/api/claims/${editClaim._id}`, fields)
       setClaims(prev => prev.map(c => c._id === editClaim._id ? res.data.claim : c))
     } catch (err) { alert(err?.response?.data?.message || "Error") }
     setEditClaim(null)
@@ -308,7 +308,7 @@ export default function MyPosts() {
                   <div style={S.card} key={item._id}
                     onClick={() => navigate(`/item/${item._id}`)}>
                     {item.images?.length > 0
-                      ? <img src={`http://localhost:5000/uploads/${item.images[0]}`} alt="" style={S.cardImg} />
+                      ? <img src={`${import.meta.env.VITE_API_URL}/uploads/${item.images[0]}`} alt="" style={S.cardImg} />
                       : <div style={S.cardImgPlaceholder} />}
 
                     <div style={S.cardBody}>
@@ -371,7 +371,7 @@ export default function MyPosts() {
                 return (
                   <div style={S.card} key={claim._id}>
                     {claim.images?.length > 0
-                      ? <img src={`http://localhost:5000/uploads/${claim.images[0]}`} alt="" style={S.cardImg} />
+                      ? <img src={`${import.meta.env.VITE_API_URL}/uploads/${claim.images[0]}`} alt="" style={S.cardImg} />
                       : <div style={{ ...S.cardImgPlaceholder, display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <CatIcon size={28} color="#d1d5db" />
                         </div>}

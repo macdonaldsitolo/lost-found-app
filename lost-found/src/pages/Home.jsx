@@ -7,7 +7,6 @@ import {
   FiCreditCard, FiBox, FiGift, FiChevronRight
 } from "react-icons/fi"
 import { getItemName, getTypeLabel, getLocationLabel, formatDate } from "../utils/itemHelpers"
-
 const CAT_ICON = {
   phone:     <FiSmartphone size={36} color="#d1d5db" />,
   laptop:    <FiMonitor    size={36} color="#d1d5db" />,
@@ -29,7 +28,7 @@ function Home() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/items")
+    axios.get("${import.meta.env.VITE_API_URL}/api/items")
       .then(res => {
         // Only show active items on the homepage
         setItems(res.data.filter(i => i.status !== "resolved"))
@@ -80,7 +79,7 @@ function Home() {
                 style={{ cursor: "pointer" }}>
 
                 {item.images?.length > 0 ? (
-                  <img src={`http://localhost:5000/uploads/${item.images[0]}`} alt="" />
+                  <img src={`${import.meta.env.VITE_API_URL}/uploads/${item.images[0]}`} alt="" />
                 ) : (
                   <div style={{ height: "180px", background: "#f2f3f7", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {catIcon}

@@ -8,7 +8,7 @@ import {
 } from "react-icons/fi"
 import { useAdminAuth } from "../context/AdminAuthContext"
 
-const API = "http://localhost:5000/api/admin"
+const API = "${import.meta.env.VITE_API_URL}/api/admin"
 const fmt = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"
 
 // ── tiny bar chart (pure SVG, no lib needed) ──────────────────────────────

@@ -19,7 +19,7 @@ export default function AdminLogin() {
     if (!username || !password) { setError("Both fields are required"); return }
     setSubmitting(true)
     try {
-      const res = await axios.post("http://localhost:5000/api/admin/auth/login", { username, password })
+      const res = await axios.post("${import.meta.env.VITE_API_URL}/api/admin/auth/login", { username, password })
       adminLogin(res.data.admin, res.data.token)
       navigate("/admin")
     } catch (err) {

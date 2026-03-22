@@ -26,7 +26,7 @@ export default function EditReport() {
   const [reward,      setReward]      = useState("")
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/items/${id}`)
+    axios.get(`${import.meta.env.VITE_API_URL}/api/items/${id}`)
       .then(res => {
         const i = res.data
         // Guard: only the owner can edit
@@ -55,7 +55,7 @@ export default function EditReport() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await axios.patch(`http://localhost:5000/api/items/${id}`, {
+      await axios.patch(`${import.meta.env.VITE_API_URL}/api/items/${id}`, {
         description, location, date, phone1, phone2, reward
       })
       setSaved(true)

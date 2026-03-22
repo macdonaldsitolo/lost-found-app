@@ -81,7 +81,7 @@ function ReportMissing() {
 
     setSubmitting(true)
     try {
-      const res = await axios.post("http://localhost:5000/api/items", formData, {
+      const res = await axios.post("${import.meta.env.VITE_API_URL}/api/items", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       })
       setSubmittedId(res.data.item._id)
