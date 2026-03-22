@@ -29,7 +29,7 @@ const itemsRoute     = require("./routes/itemsRoute")
 const claimsRoute    = require("./routes/claimsRoute")
 const authRoutes     = require("./routes/authRoutes")
 const adminAuthRoute = require("./routes/adminAuthRoute")
-const adminRoutes    = require("./routes/AdminRoutes")
+const adminRoutes    = require("./routes/adminRoutes")
 
 app.use("/api/items",      itemsRoute)
 app.use("/api/claims",     claimsRoute)
