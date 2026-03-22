@@ -4,7 +4,7 @@ import { AuthProvider }      from "./context/AuthContext"
 import { AdminAuthProvider } from "./context/AdminAuthContext"
 import ProtectedRoute        from "./components/ProtectedRoute"
 import AdminRoute            from "./components/AdminRoute"
-import Navbar                from "./components/navbar"
+import Navbar                from "./components/Navbar"
 
 import Home          from "./pages/Home"
 import Search        from "./pages/Search"
