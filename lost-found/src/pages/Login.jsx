@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"
 import FieldError, { inputErrorStyle } from "../components/FieldError"
 import { validateEmail, validateRequired } from "../utils/validators"
+import axios from "axios"
 
 function initGoogleButton(ref, callback) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -61,7 +62,7 @@ export default function Login() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await api.post(`/api/auth/google`, { idToken: response.credential })
+      const res = await axios.post(`/api/auth/google`, { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
@@ -74,7 +75,7 @@ export default function Login() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      const res = await api.post(`/api/auth/login`, { email, password })
+      const res = await axios.post(`/api/auth/login`, { email, password })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {

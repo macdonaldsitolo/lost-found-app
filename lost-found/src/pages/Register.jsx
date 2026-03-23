@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"
 import FieldError from "../components/FieldError"
 import { validateName, validateEmail, validatePhone, validatePassword } from "../utils/validators"
-
+import axios from "axios"
 function initGoogleButton(ref, callback) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   if (!clientId || !window.google?.accounts?.id || !ref) return false
@@ -85,7 +85,7 @@ export default function Register() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await api.post("/api/auth/google", { idToken: response.credential })
+      const res = await axios.post("/api/auth/google", { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate("/", { replace: true })
     } catch (err) {
@@ -103,7 +103,7 @@ export default function Register() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await api.post("/api/auth/register", {
+      await axios.post("/api/auth/register", {
         firstName, lastName, email,
         phone: phone || "",
         password
@@ -126,7 +126,7 @@ export default function Register() {
     }
     setVerifying(true)
     try {
-      const res = await api.post("/api/auth/verify-code", { email, code })
+      const res = await axios.post("/api/auth/verify-code", { email, code })
       login(res.data.user, res.data.token)
       navigate("/", { replace: true })
     } catch (err) {
@@ -142,7 +142,7 @@ export default function Register() {
     setResent(false)
     setCodeError("")
     try {
-      await api.post("/api/auth/resend-code", { email })
+      await axios.post("/api/auth/resend-code", { email })
       setResent(true)
       setCountdown(60)
       setCode("")
