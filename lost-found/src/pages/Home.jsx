@@ -29,7 +29,7 @@ function Home() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/items")
+    axios.get("https://lost-found-app-4-w6wh.onrender.com/api/items")
       .then(res => {
         // Only show active items on the homepage
         setItems(res.data.filter(i => i.status !== "resolved"))
@@ -80,7 +80,7 @@ function Home() {
                 style={{ cursor: "pointer" }}>
 
                 {item.images?.length > 0 ? (
-                  <img src={`http://localhost:5000/uploads/${item.images[0]}`} alt="" />
+                  <img src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${item.images[0]}`} alt="" />
                 ) : (
                   <div style={{ height: "180px", background: "#f2f3f7", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {catIcon}

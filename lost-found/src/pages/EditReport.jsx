@@ -26,7 +26,7 @@ export default function EditReport() {
   const [reward,      setReward]      = useState("")
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/items/${id}`)
+    axios.get(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}`)
       .then(res => {
         const i = res.data
         // Guard: only the owner can edit
@@ -55,7 +55,7 @@ export default function EditReport() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await axios.patch(`http://localhost:5000/api/items/${id}`, {
+      await axios.patch(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}`, {
         description, location, date, phone1, phone2, reward
       })
       setSaved(true)

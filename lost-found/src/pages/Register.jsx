@@ -72,7 +72,7 @@ export default function Register() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/google", { idToken: response.credential })
+      const res = await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/google", { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate("/", { replace: true })
     } catch (err) {
@@ -89,7 +89,7 @@ export default function Register() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await axios.post("http://localhost:5000/api/auth/register", {
+      await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/register", {
         firstName, lastName, email,
         phone: phone || "",
         password

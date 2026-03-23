@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
     if (!stored) { setLoading(false); return }
 
     // Always verify with the server — don't trust storage alone
-    axios.get("http://localhost:5000/api/auth/me", {
+    axios.get("https://lost-found-app-4-w6wh.onrender.com/api/auth/me", {
       headers: { Authorization: `Bearer ${stored}` }
     })
       .then(res => {

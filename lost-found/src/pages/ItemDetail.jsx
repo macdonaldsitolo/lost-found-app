@@ -95,7 +95,7 @@ function ShareModal({ item, onClose, onShared }) {
         {/* Mini preview */}
         <div style={{ border: `1.5px solid ${tc.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
           {item.images?.length > 0 ? (
-            <img src={`http://localhost:5000/uploads/${item.images[0]}`}
+            <img src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${item.images[0]}`}
               alt="" style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
           ) : (
             <div style={{ height: 60, background: tc.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -154,7 +154,7 @@ export default function ItemDetail() {
   const [caringLoading, setCaringLoading] = useState(false)
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/items/${id}`)
+    axios.get(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}`)
       .then(res => {
         setItem(res.data)
         setCaresCount(res.data.cares?.length || 0)
@@ -184,7 +184,7 @@ export default function ItemDetail() {
     if (caringLoading) return
     setCaringLoading(true)
     try {
-      const res = await axios.post(`http://localhost:5000/api/items/${id}/care`)
+      const res = await axios.post(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}/care`)
       setCaresCount(res.data.cares)
       setIsCared(res.data.cared)
     } catch {}
@@ -198,7 +198,7 @@ export default function ItemDetail() {
 
   const handleShared = async () => {
     try {
-      const res = await axios.patch(`http://localhost:5000/api/items/${id}/share`)
+      const res = await axios.patch(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}/share`)
       setSharesCount(res.data.shares)
     } catch {}
   }
@@ -206,7 +206,7 @@ export default function ItemDetail() {
   // ── Resolve ─────────────────────────────────────────────────────────────
   const handleResolve = async (comment) => {
     try {
-      await axios.patch(`http://localhost:5000/api/items/${id}/resolve`, { resolveComment: comment })
+      await axios.patch(`https://lost-found-app-4-w6wh.onrender.com/api/items/${id}/resolve`, { resolveComment: comment })
       setItem(prev => ({ ...prev, status: "resolved", resolveComment: comment }))
       setShowResolve(false)
     } catch (err) {
@@ -306,7 +306,7 @@ export default function ItemDetail() {
           <>
             <div style={S.imageWrapper}>
               <img
-                src={`http://localhost:5000/uploads/${images[imgIdx]}`}
+                src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${images[imgIdx]}`}
                 alt=""
                 style={S.image}
               />
@@ -316,7 +316,7 @@ export default function ItemDetail() {
                 {images.map((img, i) => (
                   <div key={i} onClick={() => setImgIdx(i)}
                     style={{ ...S.thumb, outline: i === imgIdx ? `2px solid ${tc.color}` : "none" }}>
-                    <img src={`http://localhost:5000/uploads/${img}`} alt=""
+                    <img src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${img}`} alt=""
                       style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 ))}

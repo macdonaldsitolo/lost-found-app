@@ -89,8 +89,8 @@ export default function Search() {
 
   useEffect(() => {
     Promise.allSettled([
-      axios.get("http://localhost:5000/api/items"),
-      axios.get("http://localhost:5000/api/claims"),
+      axios.get("https://lost-found-app-4-w6wh.onrender.com/api/items"),
+      axios.get("https://lost-found-app-4-w6wh.onrender.com/api/claims"),
     ]).then(([ir, cr]) => {
       if (ir.status === "fulfilled") setItems(ir.value.data)
       if (cr.status === "fulfilled") setClaims(cr.value.data)
@@ -351,7 +351,7 @@ export default function Search() {
               return (
                 <div className="card" key={`claim-${claim._id}`}>
                   {claim.images?.length > 0 ? (
-                    <img src={`http://localhost:5000/uploads/${claim.images[0]}`} alt="" />
+                    <img src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${claim.images[0]}`} alt="" />
                   ) : (
                     <div className="card-no-image"
                       style={{display:"flex",alignItems:"center",justifyContent:"center",background:"#f2f3f7"}}>
@@ -407,7 +407,7 @@ export default function Search() {
                 style={{ background: tc.placeholderBg || "#fafafa", border: `1px solid ${tc.border}` }}
               >
                 {result.images?.length > 0 ? (
-                  <img src={`http://localhost:5000/uploads/${result.images[0]}`} alt={getItemName(result)} />
+                  <img src={`https://lost-found-app-4-w6wh.onrender.com/uploads/${result.images[0]}`} alt={getItemName(result)} />
                 ) : (
                   <div className="card-placeholder" style={{ background: tc.bg, color: tc.color }}>
                     {catIcon}

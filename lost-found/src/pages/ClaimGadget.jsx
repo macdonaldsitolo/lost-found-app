@@ -64,7 +64,7 @@ export default function ClaimGadget() {
 
     setSubmitting(true)
     try {
-      await axios.post("http://localhost:5000/api/claims", formData, {
+      await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/claims", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       })
 setModalVisible(true)   

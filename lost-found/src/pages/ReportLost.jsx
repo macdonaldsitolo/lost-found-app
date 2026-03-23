@@ -72,7 +72,7 @@ export default function ReportLost() {
 
     setSubmitting(true)
     try {
-      const res = await axios.post("http://localhost:5000/api/items", fd, {
+      const res = await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/items", fd, {
         headers: { "Content-Type": "multipart/form-data" }
       })
       setSubmittedId(res.data.item._id)
