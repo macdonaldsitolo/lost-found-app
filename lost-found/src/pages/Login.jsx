@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import api, { imgUrl } from "../utils/api"
 import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"

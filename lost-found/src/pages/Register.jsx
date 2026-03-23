@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import api from "../utils/api"
 import { FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"
