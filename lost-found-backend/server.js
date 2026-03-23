@@ -15,8 +15,8 @@ app.use(cors({
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
-    "https://lost-found-app-7.vercel.app/"
-  ],
+    "https://lost-found-app-7-git-main-macdonald-sitolos-projects.vercel.app",
+    ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
