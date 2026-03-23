@@ -11,10 +11,13 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 // ── Email transporter ─────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
-  host:   "smtp.gmail.com",
-  port:   587,
-  secure: false,           // use STARTTLS not SSL
-  family: 4,               // force IPv4
+  host:             "smtp.gmail.com",
+  port:             587,
+  secure:           false,
+  family:           4,
+  connectionTimeout: 5000,
+  greetingTimeout:  5000,
+  socketTimeout:    5000,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -64,8 +67,8 @@ router.post("/register", async (req, res) => {
       })
     }
 
-    // Send verification code email
-    await transporter.sendMail({
+    // Send verification code email — non-blocking so registration always succeeds
+    transporter.sendMail({
       from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
       to:      email,
       subject: "Your verification code — Lost & Found Malawi",
@@ -80,8 +83,9 @@ router.post("/register", async (req, res) => {
           <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes. If you did not sign up, ignore this email.</p>
         </div>
       `,
-    })
+    }).catch(err => console.error("Email send failed:", err.message))
 
+    // Respond immediately — don't wait for email
     res.status(201).json({ message: "Verification code sent", email })
   } catch (err) {
     console.error(err)
@@ -152,7 +156,7 @@ router.post("/resend-code", async (req, res) => {
     user.verifyExpiry = new Date(Date.now() + 10 * 60 * 1000)
     await user.save()
 
-    await transporter.sendMail({
+    transporter.sendMail({
       from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
       to:      email,
       subject: "New verification code — Lost & Found Malawi",
@@ -166,7 +170,7 @@ router.post("/resend-code", async (req, res) => {
           <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes.</p>
         </div>
       `,
-    })
+    }).catch(err => console.error("Email send failed:", err.message))
 
     res.json({ message: "New code sent" })
   } catch (err) {
