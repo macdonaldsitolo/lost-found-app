@@ -9,18 +9,14 @@ const authMiddleware = require("../middleware/authMiddleware")
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
-// ── Email transporter ─────────────────────────────────────────────────────
+// ── Email transporter — Brevo SMTP ────────────────────────────────────────
 const transporter = nodemailer.createTransport({
-  host:             "smtp.gmail.com",
-  port:             587,
-  secure:           false,
-  family:           4,
-  connectionTimeout: 5000,
-  greetingTimeout:  5000,
-  socketTimeout:    5000,
+  host:   "smtp-relay.brevo.com",
+  port:   587,
+  secure: false,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: "a5d255001@smtp-brevo.com",
+    pass: process.env.BREVO_SMTP_KEY,
   },
 })
 
@@ -46,7 +42,6 @@ router.post("/register", async (req, res) => {
     const codeExpiry   = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     if (existing && !existing.isVerified) {
-      // Resend code to existing unverified account
       existing.firstName    = firstName
       existing.lastName     = lastName
       existing.phone        = phone || ""
@@ -67,9 +62,9 @@ router.post("/register", async (req, res) => {
       })
     }
 
-    // Send verification code email — non-blocking so registration always succeeds
+    // Send verification code — non-blocking
     transporter.sendMail({
-      from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
+      from:    '"Lost & Found Malawi" <newschooltechnologymalawi@gmail.com>',
       to:      email,
       subject: "Your verification code — Lost & Found Malawi",
       html: `
@@ -85,7 +80,6 @@ router.post("/register", async (req, res) => {
       `,
     }).catch(err => console.error("Email send failed:", err.message))
 
-    // Respond immediately — don't wait for email
     res.status(201).json({ message: "Verification code sent", email })
   } catch (err) {
     console.error(err)
@@ -119,7 +113,6 @@ router.post("/verify-code", async (req, res) => {
     user.verifyExpiry = undefined
     await user.save()
 
-    // Auto-login after verification
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" })
 
     res.json({
@@ -151,13 +144,13 @@ router.post("/resend-code", async (req, res) => {
     if (user.isVerified)
       return res.status(400).json({ message: "Account already verified" })
 
-    const code   = generateCode()
+    const code        = generateCode()
     user.verifyToken  = code
     user.verifyExpiry = new Date(Date.now() + 10 * 60 * 1000)
     await user.save()
 
     transporter.sendMail({
-      from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
+      from:    '"Lost & Found Malawi" <newschooltechnologymalawi@gmail.com>',
       to:      email,
       subject: "New verification code — Lost & Found Malawi",
       html: `
