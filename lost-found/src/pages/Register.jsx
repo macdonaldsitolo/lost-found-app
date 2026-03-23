@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import axios from "axios"
+import api from "../utils/api"
 import { FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"
@@ -22,22 +22,36 @@ export default function Register() {
   const navigate  = useNavigate()
   const googleRef = useRef(null)
 
-  const [firstName,  setFirstName]  = useState("")
-  const [lastName,   setLastName]   = useState("")
-  const [email,      setEmail]      = useState("")
-  const [phone,      setPhone]      = useState("")
-  const [password,   setPassword]   = useState("")
-  const [showPass,   setShowPass]   = useState(false)
-  const [confirmPass, setConfirmPass] = useState("")
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [firstName,    setFirstName]    = useState("")
+  const [lastName,     setLastName]     = useState("")
+  const [email,        setEmail]        = useState("")
+  const [phone,        setPhone]        = useState("")
+  const [password,     setPassword]     = useState("")
+  const [showPass,     setShowPass]     = useState(false)
+  const [confirmPass,  setConfirmPass]  = useState("")
+  const [showConfirm,  setShowConfirm]  = useState(false)
   const [confirmError, setConfirmError] = useState(null)
-  const [error,      setError]      = useState("")
-  const [done,       setDone]       = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [error,        setError]        = useState("")
+  const [submitting,   setSubmitting]   = useState(false)
+
+  // ── verification code state ──────────────────────────────────────────────
+  const [step,        setStep]        = useState("form")  // "form" | "verify"
+  const [code,        setCode]        = useState("")
+  const [codeError,   setCodeError]   = useState("")
+  const [verifying,   setVerifying]   = useState(false)
+  const [resending,   setResending]   = useState(false)
+  const [resent,      setResent]      = useState(false)
+  const [countdown,   setCountdown]   = useState(0)
 
   useEffect(() => { if (user) navigate("/", { replace: true }) }, [user])
 
-  // inline confirm password check
+  // countdown timer for resend
+  useEffect(() => {
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
+
   const checkConfirm = (pw, cpw) => {
     if (!cpw) { setConfirmError(null); return }
     setConfirmError(pw !== cpw ? "Passwords do not match" : null)
@@ -72,7 +86,7 @@ export default function Register() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/google", { idToken: response.credential })
+      const res = await api.post("/api/auth/google", { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate("/", { replace: true })
     } catch (err) {
@@ -80,6 +94,7 @@ export default function Register() {
     }
   }
 
+  // ── Step 1: submit registration form ─────────────────────────────────────
   const handleSubmit = async () => {
     setError("")
     if (confirmError || password !== confirmPass) {
@@ -89,12 +104,13 @@ export default function Register() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/register", {
+      await api.post("/api/auth/register", {
         firstName, lastName, email,
         phone: phone || "",
         password
       })
-      setDone(true)
+      setStep("verify")
+      setCountdown(60)  // 60 second cooldown before resend
     } catch (err) {
       setError(err?.response?.data?.message || "Registration failed")
     } finally {
@@ -102,22 +118,135 @@ export default function Register() {
     }
   }
 
-  if (done) {
+  // ── Step 2: verify the 6-digit code ──────────────────────────────────────
+  const handleVerify = async () => {
+    setCodeError("")
+    if (!code || code.length !== 6) {
+      setCodeError("Please enter the 6-digit code")
+      return
+    }
+    setVerifying(true)
+    try {
+      const res = await api.post("/api/auth/verify-code", { email, code })
+      login(res.data.user, res.data.token)
+      navigate("/", { replace: true })
+    } catch (err) {
+      setCodeError(err?.response?.data?.message || "Invalid code")
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  // ── Resend code ───────────────────────────────────────────────────────────
+  const handleResend = async () => {
+    setResending(true)
+    setResent(false)
+    setCodeError("")
+    try {
+      await api.post("/api/auth/resend-code", { email })
+      setResent(true)
+      setCountdown(60)
+      setCode("")
+    } catch (err) {
+      setCodeError(err?.response?.data?.message || "Failed to resend code")
+    } finally {
+      setResending(false)
+    }
+  }
+
+  // ── Verification screen ───────────────────────────────────────────────────
+  if (step === "verify") {
     return (
       <div style={S.screen}>
-        <div style={{ ...S.container, textAlign: "center" }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>📬</div>
-          <h2 style={S.title}>Check your email</h2>
-          <p style={{ color: "#6e6e73", fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
-            We sent a verification link to <strong>{email}</strong>.<br />
-            Click it to activate your account, then log in.
+        <div style={S.container}>
+          <div style={S.header}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📩</div>
+            <h2 style={S.title}>Check your email</h2>
+            <p style={{ ...S.subtitle, lineHeight: 1.6 }}>
+              We sent a 6-digit code to<br />
+              <strong style={{ color: "#0a4d8c" }}>{email}</strong>
+            </p>
+          </div>
+
+          {codeError && (
+            <div style={S.errorBanner}>
+              <FiAlertCircle size={16} /> {codeError}
+            </div>
+          )}
+
+          {resent && (
+            <div style={{ ...S.errorBanner, background: "#f0fff4", borderColor: "#b7ebca", color: "#1a7a3c" }}>
+              ✓ New code sent successfully
+            </div>
+          )}
+
+          {/* 6-digit code input */}
+          <div style={{ marginBottom: 8 }}>
+            <input
+              style={{
+                ...S.input,
+                textAlign: "center",
+                fontSize: 28,
+                fontWeight: 800,
+                letterSpacing: 12,
+                padding: "18px 14px",
+              }}
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              value={code}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, "")
+                setCode(val)
+                setCodeError("")
+              }}
+              onKeyDown={e => e.key === "Enter" && handleVerify()}
+              autoFocus
+            />
+          </div>
+
+          <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20, textAlign: "center" }}>
+            Code expires in 10 minutes
           </p>
-          <Link to="/login"><button style={S.submitBtn}>Go to Login</button></Link>
+
+          <button
+            style={{ ...S.submitBtn, opacity: verifying ? 0.7 : 1, marginBottom: 14 }}
+            onClick={handleVerify}
+            disabled={verifying}>
+            {verifying ? "Verifying…" : "Verify & Continue"}
+          </button>
+
+          {/* Resend */}
+          <div style={{ textAlign: "center" }}>
+            {countdown > 0 ? (
+              <p style={{ fontSize: 13, color: "#9ca3af" }}>
+                Resend code in {countdown}s
+              </p>
+            ) : (
+              <button
+                style={{ background: "none", border: "none", color: "#0a4d8c", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+                onClick={handleResend}
+                disabled={resending}>
+                {resending ? "Sending…" : "Resend code"}
+              </button>
+            )}
+          </div>
+
+          <p style={{ textAlign: "center", fontSize: 13, color: "#9ca3af", marginTop: 16 }}>
+            Wrong email?{" "}
+            <button
+              style={{ background: "none", border: "none", color: "#0a4d8c", fontWeight: 600, fontSize: 13, cursor: "pointer", padding: 0 }}
+              onClick={() => { setStep("form"); setCode(""); setCodeError("") }}>
+              Go back
+            </button>
+          </p>
         </div>
       </div>
     )
   }
 
+  // ── Registration form ─────────────────────────────────────────────────────
   return (
     <div style={S.screen}>
       <div style={S.container}>
@@ -133,12 +262,13 @@ export default function Register() {
           <>
             <div style={S.googleWrap}><div ref={googleRef} /></div>
             <div style={S.dividerRow}>
-              <div style={S.dividerLine} /><span style={S.dividerText}>or register with email</span><div style={S.dividerLine} />
+              <div style={S.dividerLine} />
+              <span style={S.dividerText}>or register with email</span>
+              <div style={S.dividerLine} />
             </div>
           </>
         )}
 
-        {/* First + Last name */}
         <div style={S.nameRow}>
           <div style={{ flex: 1 }}>
             <input style={S.input} type="text" placeholder="First name"
@@ -156,14 +286,15 @@ export default function Register() {
           value={email} onChange={e => setEmail(e.target.value)} />
         <FieldError error={errors.email} touched={touched.email} />
 
-        <input style={S.input} type="tel" placeholder="Phone number e.g. +265991234567 (optional)"
+        <input style={S.input} type="tel" placeholder="Phone number (optional)"
           value={phone} onChange={e => setPhone(e.target.value)} />
         <FieldError error={errors.phone} touched={touched.phone} />
 
         <div style={S.passWrap}>
           <input style={S.input} type={showPass ? "text" : "password"}
             placeholder="Password (min 6 chars + 1 number)"
-            value={password} onChange={e => { setPassword(e.target.value); checkConfirm(e.target.value, confirmPass) }} />
+            value={password}
+            onChange={e => { setPassword(e.target.value); checkConfirm(e.target.value, confirmPass) }} />
           <button style={S.eyeBtn} onClick={() => setShowPass(p => !p)}>
             {showPass ? <FiEyeOff size={16} /> : <FiEye size={16} />}
           </button>

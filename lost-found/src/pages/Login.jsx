@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import axios from "axios"
+import api, { imgUrl } from "../utils/api"
 import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import useValidation from "../hooks/useValidation"
@@ -62,7 +62,7 @@ export default function Login() {
   const handleGoogleResponse = async (response) => {
     setError("")
     try {
-      const res = await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/google", { idToken: response.credential })
+      const res = await api.post(`/api/auth/google`, { idToken: response.credential })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
@@ -75,11 +75,17 @@ export default function Login() {
     if (!validateAll()) return
     setSubmitting(true)
     try {
-      const res = await axios.post("https://lost-found-app-4-w6wh.onrender.com/api/auth/login", { email, password })
+      const res = await api.post(`/api/auth/login`, { email, password })
       login(res.data.user, res.data.token)
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err?.response?.data?.message || "Login failed")
+      const data = err?.response?.data
+      // If account exists but not verified, send them to register page to verify
+      if (data?.needsVerification) {
+        navigate("/register", { state: { pendingEmail: data.email, step: "verify" } })
+        return
+      }
+      setError(data?.message || "Login failed")
     } finally {
       setSubmitting(false)
     }

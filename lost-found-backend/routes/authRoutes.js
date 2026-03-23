@@ -2,14 +2,14 @@ const express    = require("express")
 const router     = express.Router()
 const bcrypt     = require("bcryptjs")
 const jwt        = require("jsonwebtoken")
-const crypto     = require("crypto")
 const nodemailer = require("nodemailer")
 const { OAuth2Client } = require("google-auth-library")
-
-const User = require("../models/User")
+const User       = require("../models/User")
 const authMiddleware = require("../middleware/authMiddleware")
 
-// ── email transporter ──────────────────────────────────────────────────────
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
+// ── Email transporter ─────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -18,129 +18,105 @@ const transporter = nodemailer.createTransport({
   },
 })
 
-// ── Google client — only create if env var is present ─────────────────────
-const googleClient = process.env.GOOGLE_CLIENT_ID
-  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
-  : null
-
-// ── helpers ────────────────────────────────────────────────────────────────
-const signToken = (user) =>
-  jwt.sign(
-    {
-      id:        user._id,
-      email:     user.email,
-      firstName: user.firstName,
-      lastName:  user.lastName,
-      avatar:    user.avatar,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  )
-
-const sendVerificationEmail = async (user, token) => {
-  const link = `${process.env.BASE_URL}/api/auth/verify-email?token=${token}`
-  await transporter.sendMail({
-    from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
-    to:      user.email,
-    subject: "Verify your email — Lost & Found Malawi",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:24px">
-        <h2 style="color:#0a4d8c">Verify your email</h2>
-        <p>Hi ${user.firstName}, thanks for signing up!</p>
-        <p>Click the button below to verify your email address.</p>
-        <a href="${link}"
-           style="display:inline-block;margin-top:12px;padding:14px 28px;
-                  background:#0a4d8c;color:white;border-radius:14px;
-                  text-decoration:none;font-weight:600">
-          Verify Email
-        </a>
-        <p style="margin-top:20px;font-size:13px;color:#888">
-          If you didn't create an account, ignore this email.
-        </p>
-      </div>
-    `,
-  })
+// ── Generate 6-digit code ─────────────────────────────────────────────────
+function generateCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// POST /api/auth/register
-// ════════════════════════════════════════════════════════════════════════════
+// ── POST /api/auth/register ───────────────────────────────────────────────
 router.post("/register", async (req, res) => {
   try {
     const { firstName, lastName, email, phone, password } = req.body
 
     if (!firstName || !lastName || !email || !password)
-      return res.status(400).json({ message: "First name, last name, email and password are required" })
-
-    if (password.length < 6)
-      return res.status(400).json({ message: "Password must be at least 6 characters" })
+      return res.status(400).json({ message: "All fields are required" })
 
     const existing = await User.findOne({ email })
-    if (existing)
-      return res.status(400).json({ message: "An account with this email already exists" })
+    if (existing && existing.isVerified)
+      return res.status(400).json({ message: "Email already registered" })
 
-    const passwordHash = await bcrypt.hash(password, 12)
-    const verifyToken  = crypto.randomBytes(32).toString("hex")
+    const passwordHash = await bcrypt.hash(password, 10)
+    const code         = generateCode()
+    const codeExpiry   = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
-    const user = new User({ firstName, lastName, email, phone, passwordHash, verifyToken, isVerified: false })
-    await user.save()
+    if (existing && !existing.isVerified) {
+      // Resend code to existing unverified account
+      existing.firstName    = firstName
+      existing.lastName     = lastName
+      existing.phone        = phone || ""
+      existing.passwordHash = passwordHash
+      existing.verifyToken  = code
+      existing.verifyExpiry = codeExpiry
+      await existing.save()
+    } else {
+      await User.create({
+        firstName,
+        lastName,
+        email,
+        phone:        phone || "",
+        passwordHash,
+        verifyToken:  code,
+        verifyExpiry: codeExpiry,
+        isVerified:   false,
+      })
+    }
 
-    sendVerificationEmail(user, verifyToken).catch(err =>
-      console.error("Verification email failed:", err)
-    )
+    // Send verification code email
+    await transporter.sendMail({
+      from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
+      to:      email,
+      subject: "Your verification code — Lost & Found Malawi",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
+          <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
+          <p style="color:#4b5563;margin-bottom:24px">Hi ${firstName}, thanks for signing up!</p>
+          <p style="color:#4b5563;margin-bottom:16px">Your verification code is:</p>
+          <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
+            <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
+          </div>
+          <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes. If you did not sign up, ignore this email.</p>
+        </div>
+      `,
+    })
 
-    res.status(201).json({ message: "Account created! Check your email to verify your account." })
+    res.status(201).json({ message: "Verification code sent", email })
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: "Server error" })
   }
 })
 
-// ════════════════════════════════════════════════════════════════════════════
-// GET /api/auth/verify-email?token=xxx
-// ════════════════════════════════════════════════════════════════════════════
-router.get("/verify-email", async (req, res) => {
+// ── POST /api/auth/verify-code ────────────────────────────────────────────
+router.post("/verify-code", async (req, res) => {
   try {
-    const { token } = req.query
-    const user = await User.findOne({ verifyToken: token })
+    const { email, code } = req.body
 
-    if (!user)
-      return res.status(400).json({ message: "Invalid or expired verification link" })
-
-    user.isVerified  = true
-    user.verifyToken = undefined
-    await user.save()
-
-    res.redirect(`${process.env.FRONTEND_URL}/login?verified=1`)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ message: "Server error" })
-  }
-})
-
-// ════════════════════════════════════════════════════════════════════════════
-// POST /api/auth/login
-// ════════════════════════════════════════════════════════════════════════════
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body
+    if (!email || !code)
+      return res.status(400).json({ message: "Email and code are required" })
 
     const user = await User.findOne({ email })
     if (!user)
-      return res.status(400).json({ message: "No account found with this email" })
+      return res.status(400).json({ message: "Account not found" })
 
-    if (!user.passwordHash)
-      return res.status(400).json({ message: "This account uses Google sign-in. Please log in with Google." })
+    if (user.isVerified)
+      return res.status(400).json({ message: "Account already verified" })
 
-    if (!user.isVerified)
-      return res.status(400).json({ message: "Please verify your email before logging in. Check your inbox." })
+    if (user.verifyToken !== code)
+      return res.status(400).json({ message: "Incorrect code" })
 
-    const match = await bcrypt.compare(password, user.passwordHash)
-    if (!match)
-      return res.status(400).json({ message: "Incorrect password" })
+    if (user.verifyExpiry && new Date() > new Date(user.verifyExpiry))
+      return res.status(400).json({ message: "Code has expired. Please register again to get a new code." })
 
-    const token = signToken(user)
+    user.isVerified   = true
+    user.verifyToken  = undefined
+    user.verifyExpiry = undefined
+    await user.save()
+
+    // Auto-login after verification
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" })
+
     res.json({
+      message: "Account verified successfully",
       token,
       user: {
         id:        user._id,
@@ -149,7 +125,7 @@ router.post("/login", async (req, res) => {
         email:     user.email,
         phone:     user.phone,
         avatar:    user.avatar,
-      },
+      }
     })
   } catch (err) {
     console.error(err)
@@ -157,40 +133,63 @@ router.post("/login", async (req, res) => {
   }
 })
 
-// ════════════════════════════════════════════════════════════════════════════
-// POST /api/auth/google
-// ════════════════════════════════════════════════════════════════════════════
-router.post("/google", async (req, res) => {
-  if (!googleClient)
-    return res.status(500).json({ message: "Google auth is not configured on this server." })
-
+// ── POST /api/auth/resend-code ────────────────────────────────────────────
+router.post("/resend-code", async (req, res) => {
   try {
-    const { idToken } = req.body
-    const ticket  = await googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    const { email } = req.body
+    const user = await User.findOne({ email })
+
+    if (!user)
+      return res.status(400).json({ message: "Account not found" })
+    if (user.isVerified)
+      return res.status(400).json({ message: "Account already verified" })
+
+    const code   = generateCode()
+    user.verifyToken  = code
+    user.verifyExpiry = new Date(Date.now() + 10 * 60 * 1000)
+    await user.save()
+
+    await transporter.sendMail({
+      from:    `"Lost & Found Malawi" <${process.env.EMAIL_USER}>`,
+      to:      email,
+      subject: "New verification code — Lost & Found Malawi",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
+          <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
+          <p style="color:#4b5563;margin-bottom:16px">Your new verification code is:</p>
+          <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
+            <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
+          </div>
+          <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes.</p>
+        </div>
+      `,
     })
-    const payload = ticket.getPayload()
-    const { sub: googleId, email, name, picture } = payload
 
-    // Split Google's full name into first / last
-    const parts     = (name || "").trim().split(" ")
-    const firstName = parts[0] || "User"
-    const lastName  = parts.slice(1).join(" ") || ""
+    res.json({ message: "New code sent" })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Server error" })
+  }
+})
 
-    let user = await User.findOne({ $or: [{ googleId }, { email }] })
+// ── POST /api/auth/login ──────────────────────────────────────────────────
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body
+    const user = await User.findOne({ email })
 
-    if (!user) {
-      user = new User({ firstName, lastName, email, googleId, avatar: picture, isVerified: true })
-      await user.save()
-    } else if (!user.googleId) {
-      user.googleId   = googleId
-      user.avatar     = user.avatar || picture
-      user.isVerified = true
-      await user.save()
-    }
+    if (!user)
+      return res.status(400).json({ message: "Invalid email or password" })
 
-    const token = signToken(user)
+    if (!user.isVerified)
+      return res.status(400).json({ message: "Please verify your email first", needsVerification: true, email })
+
+    const match = await bcrypt.compare(password, user.passwordHash)
+    if (!match)
+      return res.status(400).json({ message: "Invalid email or password" })
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" })
+
     res.json({
       token,
       user: {
@@ -200,22 +199,74 @@ router.post("/google", async (req, res) => {
         email:     user.email,
         phone:     user.phone,
         avatar:    user.avatar,
-      },
+      }
     })
   } catch (err) {
-    console.error("Google auth error:", err)
-    res.status(401).json({ message: "Google sign-in failed. Please try again." })
+    console.error(err)
+    res.status(500).json({ message: "Server error" })
   }
 })
 
-// ════════════════════════════════════════════════════════════════════════════
-// GET /api/auth/me  (protected)
-// ════════════════════════════════════════════════════════════════════════════
+// ── POST /api/auth/google ─────────────────────────────────────────────────
+router.post("/google", async (req, res) => {
+  try {
+    const { idToken } = req.body
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const { sub, email, given_name, family_name, picture } = ticket.getPayload()
+
+    let user = await User.findOne({ $or: [{ googleId: sub }, { email }] })
+
+    if (!user) {
+      user = await User.create({
+        firstName:  given_name  || "User",
+        lastName:   family_name || "",
+        email,
+        googleId:   sub,
+        avatar:     picture,
+        isVerified: true,
+      })
+    } else {
+      if (!user.googleId) user.googleId = sub
+      if (!user.isVerified) user.isVerified = true
+      if (picture) user.avatar = picture
+      await user.save()
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" })
+
+    res.json({
+      token,
+      user: {
+        id:        user._id,
+        firstName: user.firstName,
+        lastName:  user.lastName,
+        email:     user.email,
+        phone:     user.phone,
+        avatar:    user.avatar,
+      }
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Google authentication failed" })
+  }
+})
+
+// ── GET /api/auth/me ──────────────────────────────────────────────────────
 router.get("/me", authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-passwordHash -verifyToken -resetToken")
+    const user = await User.findById(req.user.id).select("-passwordHash -verifyToken -verifyExpiry -resetToken")
     if (!user) return res.status(404).json({ message: "User not found" })
-    res.json(user)
+    res.json({
+      id:        user._id,
+      firstName: user.firstName,
+      lastName:  user.lastName,
+      email:     user.email,
+      phone:     user.phone,
+      avatar:    user.avatar,
+    })
   } catch (err) {
     res.status(500).json({ message: "Server error" })
   }
