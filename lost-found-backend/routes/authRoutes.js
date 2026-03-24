@@ -2,23 +2,79 @@ const express    = require("express")
 const router     = express.Router()
 const bcrypt     = require("bcryptjs")
 const jwt        = require("jsonwebtoken")
-const nodemailer = require("nodemailer")
 const { OAuth2Client } = require("google-auth-library")
 const User       = require("../models/User")
 const authMiddleware = require("../middleware/authMiddleware")
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
-// ── Email transporter — Brevo SMTP ────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host:   "smtp-relay.brevo.com",
-  port:   587,
-  secure: false,
-  auth: {
-    user: "a5d255001@smtp-brevo.com",
-    pass: process.env.BREVO_SMTP_KEY,
-  },
-})
+// ── Brevo HTTP API email sender ────────────────────────────────────────────
+async function sendEmail({ to, subject, firstName, code }) {
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method:  "POST",
+      headers: {
+        "accept":       "application/json",
+        "content-type": "application/json",
+        "api-key":      process.env.BREVO_SMTP_KEY,
+      },
+      body: JSON.stringify({
+        sender:  { name: "Lost & Found Malawi", email: "newschooltechnologymalawi@gmail.com" },
+        to:      [{ email: to }],
+        subject,
+        htmlContent: `
+          <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
+            <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
+            <p style="color:#4b5563;margin-bottom:24px">Hi ${firstName}, thanks for signing up!</p>
+            <p style="color:#4b5563;margin-bottom:16px">Your verification code is:</p>
+            <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
+              <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
+            </div>
+            <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes. If you did not sign up, ignore this email.</p>
+          </div>
+        `,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) console.error("Brevo error:", JSON.stringify(data))
+    else console.log("Email sent to:", to)
+  } catch (err) {
+    console.error("Email send failed:", err.message)
+  }
+}
+
+async function sendResendEmail({ to, code }) {
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method:  "POST",
+      headers: {
+        "accept":       "application/json",
+        "content-type": "application/json",
+        "api-key":      process.env.BREVO_SMTP_KEY,
+      },
+      body: JSON.stringify({
+        sender:  { name: "Lost & Found Malawi", email: "newschooltechnologymalawi@gmail.com" },
+        to:      [{ email: to }],
+        subject: "New verification code — Lost & Found Malawi",
+        htmlContent: `
+          <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
+            <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
+            <p style="color:#4b5563;margin-bottom:16px">Your new verification code is:</p>
+            <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
+              <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
+            </div>
+            <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes.</p>
+          </div>
+        `,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) console.error("Brevo resend error:", JSON.stringify(data))
+    else console.log("Resend email sent to:", to)
+  } catch (err) {
+    console.error("Resend email failed:", err.message)
+  }
+}
 
 // ── Generate 6-digit code ─────────────────────────────────────────────────
 function generateCode() {
@@ -39,7 +95,7 @@ router.post("/register", async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10)
     const code         = generateCode()
-    const codeExpiry   = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    const codeExpiry   = new Date(Date.now() + 10 * 60 * 1000)
 
     if (existing && !existing.isVerified) {
       existing.firstName    = firstName
@@ -62,23 +118,8 @@ router.post("/register", async (req, res) => {
       })
     }
 
-    // Send verification code — non-blocking
-    transporter.sendMail({
-      from:    '"Lost & Found Malawi" <newschooltechnologymalawi@gmail.com>',
-      to:      email,
-      subject: "Your verification code — Lost & Found Malawi",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
-          <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
-          <p style="color:#4b5563;margin-bottom:24px">Hi ${firstName}, thanks for signing up!</p>
-          <p style="color:#4b5563;margin-bottom:16px">Your verification code is:</p>
-          <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
-            <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
-          </div>
-          <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes. If you did not sign up, ignore this email.</p>
-        </div>
-      `,
-    }).catch(err => console.error("Email send failed:", err.message))
+    // Send email via Brevo HTTP API — non-blocking
+    sendEmail({ to: email, subject: "Your verification code — Lost & Found Malawi", firstName, code })
 
     res.status(201).json({ message: "Verification code sent", email })
   } catch (err) {
@@ -149,21 +190,7 @@ router.post("/resend-code", async (req, res) => {
     user.verifyExpiry = new Date(Date.now() + 10 * 60 * 1000)
     await user.save()
 
-    transporter.sendMail({
-      from:    '"Lost & Found Malawi" <newschooltechnologymalawi@gmail.com>',
-      to:      email,
-      subject: "New verification code — Lost & Found Malawi",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:24px">
-          <h2 style="color:#0a4d8c;margin-bottom:8px">🔍 Lost & Found Malawi</h2>
-          <p style="color:#4b5563;margin-bottom:16px">Your new verification code is:</p>
-          <div style="background:#f2f3f7;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
-            <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0a4d8c">${code}</span>
-          </div>
-          <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes.</p>
-        </div>
-      `,
-    }).catch(err => console.error("Email send failed:", err.message))
+    sendResendEmail({ to: email, code })
 
     res.json({ message: "New code sent" })
   } catch (err) {
