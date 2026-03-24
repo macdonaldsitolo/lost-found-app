@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
   verifyToken:  { type: String },   // stores the 6-digit code
   verifyExpiry: { type: Date },     // code expiry time
   resetToken:   { type: String },
+  resetExpiry:  { type: Date },
   createdAt:    { type: Date, default: Date.now },
 })
 
